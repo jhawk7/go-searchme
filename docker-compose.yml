@@ -1,0 +1,8 @@
+version: '2'
+services:
+  go-searchme:
+    image: jhawk7/go-searchme
+    env_file:
+      - .env
+    ports:
+      - "8888:8888"
