@@ -1,6 +1,7 @@
 version: '2'
 services:
   go-searchme:
+    build: .
     image: jhawk7/go-searchme
     env_file:
       - .env

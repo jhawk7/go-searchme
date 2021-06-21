@@ -3,7 +3,7 @@ package groupme_api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dev/go-searchme/pkg/common"
+	"github.com/jhawk7/go-searchme/pkg/common"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 	"io/ioutil"

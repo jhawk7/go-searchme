@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 	"github.com/gorilla/mux"
-	"github.com/dev/go-searchme/pkg/common"
-	"github.com/dev/go-searchme/pkg/groupme_api"
+	"github.com/jhawk7/go-searchme/pkg/common"
+	"github.com/jhawk7/go-searchme/pkg/groupme_api"
 	"strings"
 )
 
