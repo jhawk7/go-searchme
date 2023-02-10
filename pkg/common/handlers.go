@@ -1,14 +1,15 @@
 package common
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
+	log "github.com/sirupsen/logrus"
 )
 
-func ErrorHandler(w http.ResponseWriter, err error) {
+func ErrorHandler(err error, fatal bool) {
 	if err != nil {
-		fmt.Println(err)
-		json.NewEncoder(w).Encode(err)
+		log.Errorf("error: %v", err)
+
+		if fatal {
+			panic(err)
+		}
 	}
 }

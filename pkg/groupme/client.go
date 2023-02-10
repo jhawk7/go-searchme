@@ -1,23 +1,24 @@
-package groupme_api
+package groupme
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/jhawk7/go-searchme/pkg/common"
-	"github.com/hashicorp/go-retryablehttp"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
+	"os"
+
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/pkg/errors"
 )
 
 const GetGroupsEndpoint string = "https://api.groupme.com/v3/groups?omit=memberships"
 const GetMessagesEndpoint string = "https://api.groupme.com/v3/groups/%v/messages?since_id=%v&limit=100"
 
-func CreateGroupmeClient(config *common.Config) (*GroupmeClient) {
-	client := GroupmeClient{
-		Token: config.Token,
-		GroupId: config.GroupId,
-		SinceId: config.SinceId,
+func InitClient() *Client {
+	client := Client{
+		Token:       os.Getenv("TOKEN"),
+		GroupId:     os.Getenv("GROUP_ID"),
+		SinceId:     os.Getenv("SINCE_ID"),
 		RetryClient: CreateRetryClient(),
 	}
 
@@ -30,7 +31,6 @@ func CreateRetryClient() (retryClient *retryablehttp.Client) {
 	retryClient.RetryMax = 3
 	retryClient.RequestLogHook = RequestHook
 	retryClient.ResponseLogHook = ResponseHook
-	retryClient.ErrorHandler = ErrorHandler
 
 	return retryClient
 }
@@ -43,27 +43,22 @@ var ResponseHook = func(logger retryablehttp.Logger, res *http.Response) {
 	fmt.Printf("URL: %v responded with Status: %v\n", res.Request.URL, res.StatusCode)
 }
 
-//Response will be nil if connection error occurs; with ErrorHandler we can still get the response if the endpoint responds with 500
-var ErrorHandler = func(resp *http.Response, err error, numTries int) (*http.Response, error) {
-	if resp != nil {
-		fmt.Printf("Error. [Status: %v] [Error: %v] [Tries: %v]", resp.StatusCode, err, numTries)
-	} else {
-		fmt.Printf("Error. [Status: NO RESPONSE OBJECT] [Error: %v] [Tries: %v]", err, numTries)
-
-	}
-	return resp, err
-}
-
-func (client *GroupmeClient) GetUserGroups() (groupsResponse GroupsResponse, respErr error) {
+func (client *Client) GetUserGroups() (groupsResponse GroupsResponse, respErr error) {
 	url := GetGroupsEndpoint
 
 	request, _ := retryablehttp.NewRequest("GET", url, nil)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Access-Token", client.Token)
 	response, requestErr := client.RetryClient.Do(request)
-	respBody, _ := ioutil.ReadAll(response.Body)
+
 	if requestErr != nil {
-		respErr = errors.New(fmt.Sprintf("[ERROR: %v], [RESPONSE: %v]", requestErr, respBody))
+		respErr = fmt.Errorf("failed to make request for user groups; [error: %v]", requestErr)
+		return
+	}
+
+	respBody, _ := ioutil.ReadAll(response.Body)
+	if response.StatusCode > 299 {
+		respErr = fmt.Errorf("non-200 status received from user group response; [status: %v] [body: %v]", response.StatusCode, string(respBody))
 		return
 	}
 
@@ -71,23 +66,29 @@ func (client *GroupmeClient) GetUserGroups() (groupsResponse GroupsResponse, res
 	groupsResponse = GroupsResponse{}
 	parseErr := json.Unmarshal(respBody, &groupsResponse)
 	if parseErr != nil {
-		respErr = errors.New(fmt.Sprintf("Error parsing GetUserGroups response. [ERROR: %v]", parseErr))
+		respErr = fmt.Errorf("failed to parse user group response; [error: %v]", parseErr)
 		return
 	}
 
 	return
 }
 
-func (client *GroupmeClient) GetGroupMessages() (messagesResponse GroupMessagesResponse, respErr error) {
+func (client *Client) GetGroupMessages() (messagesResponse GroupMessagesResponse, respErr error) {
 	url := fmt.Sprintf(GetMessagesEndpoint, client.GroupId, client.SinceId)
 
 	request, _ := retryablehttp.NewRequest("GET", url, nil)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Access-Token", client.Token)
 	response, requestErr := client.RetryClient.Do(request)
-	respBody, _ := ioutil.ReadAll(response.Body)
+
 	if requestErr != nil {
-		respErr = errors.New(fmt.Sprintf("[ERROR: %v], [RESPONSE: %v]", requestErr, respBody))
+		respErr = fmt.Errorf("failed to get group messages; [error: %v]", requestErr)
+		return
+	}
+
+	respBody, _ := ioutil.ReadAll(response.Body)
+	if response.StatusCode > 299 {
+		respErr = fmt.Errorf("non-200 status received from user group response; [status: %v] [body: %v]", response.StatusCode, string(respBody))
 		return
 	}
 
@@ -100,5 +101,4 @@ func (client *GroupmeClient) GetGroupMessages() (messagesResponse GroupMessagesR
 	}
 
 	return
-
 }
