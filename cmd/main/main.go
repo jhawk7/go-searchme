@@ -57,8 +57,14 @@ func GetGroupMessages(c *gin.Context) {
 		filterGroupMessages(keyword, &groupMessages)
 	}
 
+	//return text from message only
+	textMessages := []string{}
+	for _, message := range groupMessages.Response.Messages {
+		textMessages = append(textMessages, message.Text)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data": groupMessages,
+		"data": textMessages,
 	})
 }
 
