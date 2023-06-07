@@ -12,8 +12,8 @@ import (
 )
 
 const GetGroupsEndpoint string = "https://api.groupme.com/v3/groups?omit=memberships"
-const GetMessagesEndpoint string = "https://api.groupme.com/v3/groups/%v/messages?since_id=%v&limit=100"
-
+const GetMessagesSinceEndpoint string = "https://api.groupme.com/v3/groups/%v/messages?since_id=%v&limit=100"
+const GetMessagesBeforeEndpoint string = "https://api.groupme.com/v3/groups/%v/messages?before_id=%v&limit=100"
 func InitClient() *Client {
 	client := Client{
 		Token:       os.Getenv("TOKEN"),
@@ -73,8 +73,14 @@ func (client *Client) GetUserGroups() (groupsResponse GroupsResponse, respErr er
 	return
 }
 
-func (client *Client) GetGroupMessages() (messagesResponse GroupMessagesResponse, respErr error) {
-	url := fmt.Sprintf(GetMessagesEndpoint, client.GroupId, client.SinceId)
+func (client *Client) GetGroupMessages(beforeId *string) (messagesResponse GroupMessagesResponse, firstMessageId string, respErr error) {
+	var url string
+	//make api call based on messages before given beforeId if present 
+	if beforeId == nil {
+		url = fmt.Sprintf(GetMessagesSinceEndpoint, client.GroupId, client.SinceId)
+	} else {
+		url = fmt.Sprintf(GetMessagesBeforeEndpoint, client.GroupId, *beforeId)
+	}
 
 	request, _ := retryablehttp.NewRequest("GET", url, nil)
 	request.Header.Set("Content-Type", "application/json")
@@ -99,6 +105,9 @@ func (client *Client) GetGroupMessages() (messagesResponse GroupMessagesResponse
 		respErr = errors.New(fmt.Sprintf("Error parsing GetUserGroups response. [ERROR: %v]", parseErr))
 		return
 	}
+
+	//can be used as before ID subsequent call to get earlier messages
+	firstMessageId = messagesResponse.Response.Messages[0].Id
 
 	return
 }

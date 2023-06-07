@@ -48,7 +48,7 @@ func GetUserGroups(c *gin.Context) {
 
 func GetGroupMessages(c *gin.Context) {
 	keyword := c.Param("keyword")
-	groupMessages, groupErr := gmClient.GetGroupMessages()
+	groupMessages, _, groupErr := gmClient.GetGroupMessages(nil)
 	if groupErr != nil {
 		ErrorHandler(groupErr, false)
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -61,20 +61,14 @@ func GetGroupMessages(c *gin.Context) {
 		filterGroupMessages(keyword, &groupMessages, false)
 	}
 
-	//return text from message only
-	textMessages := []string{}
-	for _, message := range groupMessages.Response.Messages {
-		textMessages = append(textMessages, message.Text)
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"data": textMessages,
+		"data": groupMessages.Response.Messages,
 	})
 }
 
 func DisplayFlightDeals(c *gin.Context) {
 	keyword := c.Param("keyword")
-	groupMessages, groupErr := gmClient.GetGroupMessages()
+	groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(nil)
 	if groupErr != nil {
 		ErrorHandler(groupErr, false)
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -82,6 +76,19 @@ func DisplayFlightDeals(c *gin.Context) {
 		})
 		return
 	}
+
+	//paginated call
+	groupMessages2, _, groupErr2 := gmClient.GetGroupMessages(&firstMessageId)
+	if groupErr2 != nil {
+		ErrorHandler(groupErr2, false)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "bad request",
+		})
+		return
+	}
+
+	//combine group message responses
+	groupMessages.Response.Messages = append(groupMessages.Response.Messages, groupMessages2.Response.Messages...)
 
 	if keyword != "" {
 		filterGroupMessages(keyword, &groupMessages, false)
