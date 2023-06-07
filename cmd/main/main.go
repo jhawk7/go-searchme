@@ -3,10 +3,12 @@ package main
 import (
 	"net/http"
 	"strings"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jhawk7/go-searchme/pkg/groupme"
 	log "github.com/sirupsen/logrus"
+	xurls "mvdan.cc/xurls/v2"
 )
 
 var gmClient *groupme.Client
@@ -14,10 +16,12 @@ var gmClient *groupme.Client
 func main() {
 	gmClient = groupme.InitClient()
 	router := gin.Default()
+	router.LoadHTMLGlob("templates/*")
 	router.GET("/healthcheck", HealthCheck)
 	router.GET("/groupme/groups", GetUserGroups)
 	router.GET("/groupme/group/messages", GetGroupMessages)
 	router.GET("/groupme/group/messages/:keyword", GetGroupMessages)
+	router.GET("/flights/:keyword", DisplayFlightDeals)
 	router.Run(":8888")
 }
 
@@ -54,7 +58,7 @@ func GetGroupMessages(c *gin.Context) {
 	}
 
 	if keyword != "" {
-		filterGroupMessages(keyword, &groupMessages)
+		filterGroupMessages(keyword, &groupMessages, false)
 	}
 
 	//return text from message only
@@ -68,16 +72,48 @@ func GetGroupMessages(c *gin.Context) {
 	})
 }
 
-func filterGroupMessages(keyword string, groupMessages *groupme.GroupMessagesResponse) {
+func DisplayFlightDeals(c *gin.Context) {
+	keyword := c.Param("keyword")
+	groupMessages, groupErr := gmClient.GetGroupMessages()
+	if groupErr != nil {
+		ErrorHandler(groupErr, false)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "bad request",
+		})
+		return
+	}
+
+	if keyword != "" {
+		filterGroupMessages(keyword, &groupMessages, false)
+	}
+
+	// Render HTML template
+	c.HTML(http.StatusOK, "flight_deals.tmpl", gin.H{
+		"Messages": groupMessages.Response.Messages,
+	})
+}
+
+func filterGroupMessages(keyword string, groupMessages *groupme.GroupMessagesResponse, highlightLinks bool) {
 	messages := groupMessages.Response.Messages
 	parsedMessages := []groupme.Message{}
 	for _, message := range messages {
 		if strings.Contains(strings.ToLower(message.Text), strings.ToLower(keyword)) {
+			if highlightLinks {
+				addHyperlinks(&message)
+			}
 			parsedMessages = append(parsedMessages, message)
 		}
 	}
 
 	groupMessages.Response.Messages = parsedMessages
+}
+
+func addHyperlinks(message *groupme.Message ) {
+	urls := xurls.Strict().FindAllString(message.Text, -1)
+	for _, url := range urls {
+		hypertext := strings.ReplaceAll(message.Text, url, fmt.Sprintf(`<a href="%v">%v</a>`, url, url))
+		message.Text = hypertext
+	}
 }
 
 func ErrorHandler(err error, fatal bool) {

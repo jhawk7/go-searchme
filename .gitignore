@@ -1,4 +1,4 @@
 .env
-env.sh
+.env.sh
 bin/
 .idea/

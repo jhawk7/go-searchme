@@ -9,4 +9,5 @@ FROM golang:1.20.0-alpine3.17
 WORKDIR /go
 EXPOSE 8888
 COPY --from=builder /go/app/bin/go-searchme ./
+COPY ./templates ./
 ENTRYPOINT ["./go-searchme"]
