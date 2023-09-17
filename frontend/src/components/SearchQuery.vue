@@ -36,7 +36,7 @@ export default {
     fetchData() {
       // Replace 'YOUR_API_URL' with the actual API endpoint, and pass the 'searchQuery' as a query parameter
       this.showData = true;
-      const apiUrl = `http://localhost:8888/flights/${this.searchQuery}`;
+      const apiUrl = `/flights/${this.searchQuery}`;
 
       // Make the API request using Axios or Fetch
       axios
