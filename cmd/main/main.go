@@ -21,7 +21,7 @@ func main() {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET"},
-		AllowHeaders: []string{"Origin"},
+		AllowHeaders: []string{"Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"},
 	}))
 	router.Use(static.Serve("/", static.LocalFile("./frontend/dist", false)))
 	router.GET("/healthcheck", HealthCheck)
