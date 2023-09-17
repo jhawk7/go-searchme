@@ -1,10 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
-	"fmt"
 
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/jhawk7/go-searchme/pkg/groupme"
 	log "github.com/sirupsen/logrus"
@@ -16,12 +17,9 @@ var gmClient *groupme.Client
 func main() {
 	gmClient = groupme.InitClient()
 	router := gin.Default()
-	router.LoadHTMLGlob("templates/*")
+	router.Use(static.Serve("/", static.LocalFile("./frontend/dist", false)))
 	router.GET("/healthcheck", HealthCheck)
-	router.GET("/groupme/groups", GetUserGroups)
-	router.GET("/groupme/group/messages", GetGroupMessages)
-	router.GET("/groupme/group/messages/:keyword", GetGroupMessages)
-	router.GET("/flights/:keyword", DisplayFlightDeals)
+	router.GET("/flights/:keyword", GetFlightDeals)
 	router.Run(":8888")
 }
 
@@ -31,42 +29,7 @@ func HealthCheck(c *gin.Context) {
 	})
 }
 
-func GetUserGroups(c *gin.Context) {
-	groups, groupsErr := gmClient.GetUserGroups()
-	if groupsErr != nil {
-		ErrorHandler(groupsErr, false)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "bad reqeust",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"data": groups,
-	})
-}
-
-func GetGroupMessages(c *gin.Context) {
-	keyword := c.Param("keyword")
-	groupMessages, _, groupErr := gmClient.GetGroupMessages(nil)
-	if groupErr != nil {
-		ErrorHandler(groupErr, false)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "bad request",
-		})
-		return
-	}
-
-	if keyword != "" {
-		filterGroupMessages(keyword, &groupMessages, false)
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"data": groupMessages.Response.Messages,
-	})
-}
-
-func DisplayFlightDeals(c *gin.Context) {
+func GetFlightDeals(c *gin.Context) {
 	keyword := c.Param("keyword")
 	groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(nil)
 	if groupErr != nil {
@@ -91,12 +54,11 @@ func DisplayFlightDeals(c *gin.Context) {
 	groupMessages.Response.Messages = append(groupMessages.Response.Messages, groupMessages2.Response.Messages...)
 
 	if keyword != "" {
-		filterGroupMessages(keyword, &groupMessages, false)
+		filterGroupMessages(keyword, &groupMessages, true)
 	}
 
-	// Render HTML template
-	c.HTML(http.StatusOK, "flight_deals.tmpl", gin.H{
-		"Messages": groupMessages.Response.Messages,
+	c.JSON(http.StatusOK, gin.H{
+		"data": groupMessages.Response.Messages,
 	})
 }
 
@@ -115,7 +77,7 @@ func filterGroupMessages(keyword string, groupMessages *groupme.GroupMessagesRes
 	groupMessages.Response.Messages = parsedMessages
 }
 
-func addHyperlinks(message *groupme.Message ) {
+func addHyperlinks(message *groupme.Message) {
 	urls := xurls.Strict().FindAllString(message.Text, -1)
 	for _, url := range urls {
 		hypertext := strings.ReplaceAll(message.Text, url, fmt.Sprintf(`<a href="%v">%v</a>`, url, url))
