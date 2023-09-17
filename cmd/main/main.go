@@ -19,11 +19,9 @@ func main() {
 	gmClient = groupme.InitClient()
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET"},
-		AllowHeaders:     []string{"Origin"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET"},
+		AllowHeaders: []string{"Origin"},
 	}))
 	router.Use(static.Serve("/", static.LocalFile("./frontend/dist", false)))
 	router.GET("/healthcheck", HealthCheck)
