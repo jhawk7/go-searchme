@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/jhawk7/go-searchme/pkg/groupme"
@@ -17,6 +18,13 @@ var gmClient *groupme.Client
 func main() {
 	gmClient = groupme.InitClient()
 	router := gin.Default()
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 	router.Use(static.Serve("/", static.LocalFile("./frontend/dist", false)))
 	router.GET("/healthcheck", HealthCheck)
 	router.GET("/flights/:keyword", GetFlightDeals)
