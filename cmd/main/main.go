@@ -37,41 +37,50 @@ func HealthCheck(c *gin.Context) {
 
 func GetFlightDeals(c *gin.Context) {
 	keyword := c.Param("keyword")
-	groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(nil)
-	if groupErr != nil {
-		ErrorHandler(groupErr, false)
+	var combinedMessages []groupme.Message
+	var offset *string
+	var err error
+
+	if offsetParam := c.DefaultQuery("offset", ""); offsetParam == "" {
+		offset = nil
+	} else {
+		offset = &offsetParam
+	}
+
+	// retrieves last 200 messages via 2 API calls
+	for i := 0; i < 2; i++ {
+		groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(offset)
+		if groupErr != nil {
+			err = groupErr
+			break
+		}
+		combinedMessages = append(combinedMessages, groupMessages.Response.Messages...)
+		offset = &firstMessageId
+	}
+
+	if err != nil {
+		ErrorHandler(err, false)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "bad request",
 		})
 		return
 	}
-
-	//paginated call
-	groupMessages2, _, groupErr2 := gmClient.GetGroupMessages(&firstMessageId)
-	if groupErr2 != nil {
-		ErrorHandler(groupErr2, false)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "bad request",
-		})
-		return
-	}
-
-	//combine group message responses
-	groupMessages.Response.Messages = append(groupMessages.Response.Messages, groupMessages2.Response.Messages...)
 
 	if keyword != "" {
-		filterGroupMessages(keyword, &groupMessages, true)
+		filterGroupMessages(keyword, &combinedMessages, true)
 	}
 
+	//cache offset:messages
+
 	c.JSON(http.StatusOK, gin.H{
-		"data": groupMessages.Response.Messages,
+		"messages": combinedMessages,
+		"offset":   *offset,
 	})
 }
 
-func filterGroupMessages(keyword string, groupMessages *groupme.GroupMessagesResponse, highlightLinks bool) {
-	messages := groupMessages.Response.Messages
+func filterGroupMessages(keyword string, groupMessages *[]groupme.Message, highlightLinks bool) {
 	parsedMessages := []groupme.Message{}
-	for _, message := range messages {
+	for _, message := range *groupMessages {
 		if strings.Contains(strings.ToLower(message.Text), strings.ToLower(keyword)) {
 			if highlightLinks {
 				addHyperlinks(&message)
@@ -80,7 +89,7 @@ func filterGroupMessages(keyword string, groupMessages *groupme.GroupMessagesRes
 		}
 	}
 
-	groupMessages.Response.Messages = parsedMessages
+	*groupMessages = parsedMessages
 }
 
 func addHyperlinks(message *groupme.Message) {

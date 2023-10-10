@@ -12,8 +12,12 @@
           <br/>
           <div>
             <div id="dataBlock" class="vstack gap-3" v-if="showData">
-              <p class="p-2" v-for="msg in apiData" :key="msg.id"><span v-html="msg.text"></span></p>
+              <p class="p-2" v-for="msg in paginatedData" :key="msg.id"><span v-html="msg.text"></span></p>
             </div>
+          </div>
+          <div class="pagination">
+            <button class="btn btn-link" @click="previousPage" :disabled="currentPage === 1">Previous</button>
+            <button class="btn btn-link" @click="nextPage" :disabled="currentPage === totalPages || apiData.length === 0">Next</button>
           </div>
         </div>
       </div>
@@ -29,31 +33,66 @@ export default {
     return {
       searchQuery: '',
       apiData: [],
-      showData: false
+      offset: '',
+      showData: false,
+      currentPage: 1,
+      itemsPerPage: 20,
     };
+  },
+  computed: {
+    totalPages() {
+      var totalItems = this.apiData.length;
+      return Math.ceil(totalItems / this.itemsPerPage);
+    },
+    paginatedData() {
+      var end = this.currentPage * this.itemsPerPage;
+      var start = end - this.itemsPerPage;
+      return this.apiData.slice(start,end);
+    }
   },
   methods: {
     fetchData() {
       // Replace 'YOUR_API_URL' with the actual API endpoint, and pass the 'searchQuery' as a query parameter
       this.showData = true;
-      const apiUrl = `/flights/${this.searchQuery}`;
+      const apiUrl = `/flights/${this.searchQuery}?offset=${this.offset}`;
 
       // Make the API request using Axios or Fetch
       axios
         .get(apiUrl)
         .then((response) => {
-          this.apiData = response.data.data;
+          this.apiData = response.data.messages;
+          this.offset = response.data.offset;
         })
         .catch((error) => {
           console.error(error);
         });
     },
 
+    previousPage() {
+      if (this.currentPage > 1) {
+        this.currentPage--;
+      }
+    },
+
+    nextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage++;
+      }
+    },
+
     clearData() {
       this.showData = false;
       this.searchQuery = "";
-      this.apiData = []
+      this.apiData = [];
+      this.offset = "";
+      this.currentPage = 1;
     }
   },
 };
 </script>
+
+<style>
+.pagination {
+  justify-content: center;
+}
+</style>
