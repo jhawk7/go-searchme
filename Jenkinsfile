@@ -16,7 +16,7 @@ pipeline {
           kubernetes.io/hostname: node7
         containers:
         - name: docker
-          image: docker/docker:latest
+          image: docker:latest
           volumeMounts:
           - name: docker-build-cache
             mountPath: /var/lib/docker
