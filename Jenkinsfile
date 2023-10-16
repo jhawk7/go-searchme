@@ -29,7 +29,7 @@ pipeline {
         restartPolicy: Never
         volumes:
           - name: docker-config
-          - name: dockerfile-storage
+          - name: docker-cache
             persistentVolumeClaim:
               claimName: docker-build-cache
       '''
