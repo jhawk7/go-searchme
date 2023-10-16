@@ -5,39 +5,35 @@ pipeline {
       apiVersion: v1
       kind: Pod
       metadata:
-        name: dind
-        namespace: devops
+        name: kaniko
+        namespace: kaniko
       spec:
-        volumes:
-          - name: docker-build-cache
-            persistentVolumeClaim: 
-              claimName: docker-build-cache
         nodeSelector:
           kubernetes.io/hostname: node7
         containers:
-        - name: docker
-          image: docker:dind
+        - name: kaniko-demo
+          image: gcr.io/kaniko-project/executor:latest
+          args: ["--context=git://github.com/jhawk7/go-searchme.git",
+            "--destination=jhawk7/go-searchme: "${BUILD_NUMBER}"
+            "--destination=jhawk7/go-searchme:latest",
+            "--dockerfile=Dockerfile",
+            "--context=dir://workspace",
+            "--custom-platform=linux/arm64"]
           volumeMounts:
-          - name: docker-build-cache
-            mountPath: /var/lib/docker
-            subPath: docker
-          command:
-          - cat
-          tty: true
-          securityContext:
-            privileged: true
+            - name: docker-config
+              mountPath: /kaniko/.docker
+            - name: docker-cache
+              mountPath: /workspace
+          envFrom:
+          - secretRef:
+              name: github-secret
+        restartPolicy: Never
+        volumes:
+          - name: docker-config
+          - name: dockerfile-storage
+            persistentVolumeClaim:
+              claimName: docker-build-cache
       '''
-    }
-  }
-  stages {
-    stage('build/push') {
-      steps {
-        container('docker') {
-          sh "docker build  -t jhawk7/go-searchme:$BUILD_NUMBER ."
-          sh "docker push jhawk7/go-searchme:$BUILD_NUMBER"
-          sh "docker push jhawk7/go-searchme:latest"
-        }
-      }
     }
   }
 }
