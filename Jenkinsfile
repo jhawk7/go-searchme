@@ -27,9 +27,11 @@ pipeline {
   }
   stages {
     stage('build/push') {
-      container('docker') {
-        sh "docker build  -t jhawk7/go-searchme:$BUILD_NUMBER ."
-        sh "docker push jhawk7/go-searchme:$BUILD_NUMBER"
+      steps {
+        container('docker') {
+          sh "docker build  -t jhawk7/go-searchme:$BUILD_NUMBER ."
+          sh "docker push jhawk7/go-searchme:$BUILD_NUMBER"
+        }
       }
     }
   }
