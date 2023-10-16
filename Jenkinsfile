@@ -12,6 +12,8 @@ pipeline {
           - name: docker-build-cache
             persistentVolumeClaim: 
               claimName: docker-build-cache
+        nodeSelector:
+          kubernetes.io/hostname: node7
         containers:
         - name: docker
           image: docker/docker:latest
@@ -33,6 +35,7 @@ pipeline {
         container('docker') {
           sh "docker build  -t jhawk7/go-searchme:$BUILD_NUMBER ."
           sh "docker push jhawk7/go-searchme:$BUILD_NUMBER"
+          sh "docker push jhawk7/go-searchme:latest"
         }
       }
     }
