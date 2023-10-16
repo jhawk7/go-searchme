@@ -6,7 +6,7 @@ pipeline {
       kind: Pod
       metadata:
         name: kaniko
-        namespace: kaniko
+        namespace: devops
       spec:
         nodeSelector:
           kubernetes.io/hostname: node7
