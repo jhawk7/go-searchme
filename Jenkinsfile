@@ -40,9 +40,11 @@ pipeline {
           '''
         }
       }
-    }
-    stage ("fin") {
-      sh "echo image jhawk7/go-searchme:$BUILD_NUMBER pushed"
+      steps {
+        script {
+          sh "echo image jhawk7/go-searchme:$BUILD_NUMBER pushed"
+        }
+      }
     }
   }
 }
