@@ -4,12 +4,14 @@ pipeline {
       yaml '''
       apiVersion: v1
       kind: Pod
+      metadata:
+        name: dind
+        namespace: devops
       spec:
         volumes:
           - name: docker-build-cache
             persistentVolumeClaim: 
               claimName: docker-build-cache
-        serviceAccountName: jenkins-agents
         containers:
         - name: docker
           image: docker/docker:latest
