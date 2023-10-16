@@ -22,7 +22,6 @@ pipeline {
                 "--dockerfile=Dockerfile",
                 "--context=dir://workspace",
                 "--custom-platform=linux/arm64"]
-              tty: true
               volumeMounts:
                 - name: docker-config
                   mountPath: /kaniko/.docker
