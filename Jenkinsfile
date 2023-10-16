@@ -14,7 +14,7 @@ pipeline {
         - name: kaniko-demo
           image: gcr.io/kaniko-project/executor:latest
           args: ["--context=git://github.com/jhawk7/go-searchme.git",
-            "--destination=jhawk7/go-searchme: "${BUILD_NUMBER}"
+            "--destination=jhawk7/go-searchme:"${BUILD_NUMBER}",
             "--destination=jhawk7/go-searchme:latest",
             "--dockerfile=Dockerfile",
             "--context=dir://workspace",
