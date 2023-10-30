@@ -1,6 +1,7 @@
 pipeline {
   agent {
     kubernetes {
+      defaultContainer 'kaniko'
       yaml '''
       apiVersion: v1
       kind: Pod
@@ -15,12 +16,11 @@ pipeline {
           image: gcr.io/kaniko-project/executor:debug
           imagePullPolicy: Always
           command:
-          - sleep
-          args:
-          - 9999999
+          - /busybox/cat
+          tty: true
           volumeMounts:
             - name: docker-config
-              mountPath: /kaniko/.docker
+              mountPath: /kaniko/.docker/
             - name: docker-cache
               mountPath: /kaniko/
           envFrom:
@@ -39,11 +39,12 @@ pipeline {
   stages {
     stage("build/deploy") {
       steps {
+        checkout scm
         container(name: 'kaniko', shell: '/busybox/sh') {
           sh '''#!/busybox/sh
           /kaniko/executor --dockerfile=Dockerfile \
           --context=git://github.com/jhawk7/go-searchme.git \
-          --cache=true
+          --cache=true \
           --custom-platform=linux/arm64 \
           --destination=jhawk7/go-searchme:$BUILD_ID \
           --destination=jhawk7/go-searchme:latest'''
