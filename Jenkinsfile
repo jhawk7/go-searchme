@@ -1,7 +1,6 @@
 pipeline {
   agent {
     kubernetes {
-      defaultContainer 'kaniko'
       yaml '''
       apiVersion: v1
       kind: Pod
@@ -21,17 +20,17 @@ pipeline {
           volumeMounts:
             - name: docker-config
               mountPath: /kaniko/.docker/
-            - name: docker-cache
-              mountPath: /kaniko/
           envFrom:
           - secretRef:
               name: github-secret
         restartPolicy: Never
         volumes:
           - name: docker-config
-          - name: docker-cache
-            persistentVolumeClaim:
-              claimName: docker-build-cache
+            secret:
+              secretName: docker-credentials
+              items:
+                - key: .dockerconfigjson
+                  path: config.json
       '''
     }
   }
@@ -41,14 +40,16 @@ pipeline {
       steps {
         checkout scm
         container(name: 'kaniko', shell: '/busybox/sh') {
-          sh '''#!/busybox/sh
-          /kaniko/executor --dockerfile=Dockerfile \
-          --context=git://github.com/jhawk7/go-searchme.git \
-          --cache=true \
-          --custom-platform=linux/arm64 \
-          --destination=jhawk7/go-searchme:$BUILD_ID \
-          --destination=jhawk7/go-searchme:latest'''
-        }
+          withEnv(['PATH+EXTRA=/busybox:/kaniko']) {
+            sh '''#!/busybox/sh
+            /kaniko/executor --dockerfile=Dockerfile \
+            --context=`pwd` \
+            --cache=true \
+            --custom-platform=linux/arm64 \
+            --destination=jhawk7/go-searchme:$BUILD_ID \
+            --destination=jhawk7/go-searchme:latest'''
+          }
+        }   
       }
     }
   }
