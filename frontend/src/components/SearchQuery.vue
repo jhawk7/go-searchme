@@ -12,6 +12,7 @@
           <br/>
           <div>
             <div id="dataBlock" class="vstack gap-3" v-if="showData">
+              <p class="p-2" v-if="noData">No Data</p>
               <p class="p-2" v-for="msg in paginatedData" :key="msg.id"><span v-html="msg.text"></span></p>
             </div>
           </div>
@@ -48,6 +49,9 @@ export default {
       var end = this.currentPage * this.itemsPerPage;
       var start = end - this.itemsPerPage;
       return this.apiData.slice(start,end);
+    },
+    noData() {
+      return this.apiData.length === 0;
     }
   },
   methods: {

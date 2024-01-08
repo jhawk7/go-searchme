@@ -15,6 +15,5 @@ FROM golang:1.20.0-alpine3.17
 WORKDIR /go
 EXPOSE 8888
 COPY --from=builder /go/app/bin/go-searchme ./
-#COPY frontend/dist/ frontend/dist/
 COPY --from=asset-builder /frontend/dist ./frontend/dist
 ENTRYPOINT ["./go-searchme"]

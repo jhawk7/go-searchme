@@ -3,3 +3,4 @@
 .env.sh
 bin/
 .idea/
+node_modules/
