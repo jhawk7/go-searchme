@@ -1,4 +1,4 @@
-FROM golang:1.20.0-alpine3.17 AS builder
+FROM golang:1.21-alpine3.17 AS builder
 WORKDIR /go/app
 COPY . ./
 RUN go mod download
@@ -11,7 +11,7 @@ COPY --from=builder /go/app/frontend .
 RUN npm install
 RUN npm run build
 
-FROM golang:1.20.0-alpine3.17
+FROM golang:1.21-alpine3.17
 WORKDIR /go
 EXPOSE 8888
 COPY --from=builder /go/app/bin/go-searchme ./
