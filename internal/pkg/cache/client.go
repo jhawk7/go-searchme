@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -47,20 +48,37 @@ func InitClient() *RedisClient {
 	return &redisClient
 }
 
-func (redisClient *RedisClient) GetValue(ctx context.Context, key string) (value string, err error) {
-	value, getErr := redisClient.svc.Get(ctx, key).Result()
+func (redisClient *RedisClient) GetValue(ctx context.Context, key string) (value []interface{}, miss bool, err error) {
+	data, getErr := redisClient.svc.Get(ctx, key).Result()
 	if getErr != nil {
-		err = fmt.Errorf("key %v not found; %v", key, getErr)
-		common.LogInfo(fmt.Sprintf("cache miss; [key: %v]", key))
-	} else {
-		common.LogInfo(fmt.Sprintf("cache hit, [key: %v]", key))
+		if getErr.Error() != redis.Nil.Error() {
+			err = fmt.Errorf("failed to retrieve value for key %v", key)
+			miss = false
+		} else {
+			common.LogInfo(fmt.Sprintf("cache miss; [key: %v]", key))
+			miss = true
+		}
+		return
+	}
+
+	common.LogInfo(fmt.Sprintf("cache hit, [key: %v]", key))
+
+	if uErr := json.Unmarshal([]byte(data), &value); uErr != nil {
+		err = fmt.Errorf("failed to unmarshall cache data; %v", uErr)
+		return
 	}
 
 	return
 }
 
 func (redisClient *RedisClient) Store(ctx context.Context, kv KVPair) (err error) {
-	if storeErr := redisClient.svc.HSet(ctx, kv.Key, kv.Value, time.Hour).Err(); storeErr != nil {
+	bytes, mErr := json.Marshal(kv.Value)
+	if mErr != nil {
+		err = fmt.Errorf("failed to marshal kv value of messages; %v", mErr)
+		return
+	}
+
+	if storeErr := redisClient.svc.Set(ctx, kv.Key, string(bytes), time.Hour).Err(); storeErr != nil {
 		err = fmt.Errorf("unable to store kv pair; [error: %v]", storeErr)
 	} else {
 		common.LogInfo(fmt.Sprintf("kv pair stored [key: %v]", kv.Key))

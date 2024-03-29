@@ -18,7 +18,7 @@
           </div>
           <div class="pagination">
             <button class="btn btn-link" @click="previousPage" :disabled="currentPage === 1">Previous</button>
-            <button class="btn btn-link" @click="nextPage" :disabled="currentPage === totalPages || apiData.length === 0">Next</button>
+            <button class="btn btn-link" @click="nextPage" :disabled="currentPage === totalPages || apiData.length === 0 || totalPages === 1">Next</button>
           </div>
         </div>
       </div>
@@ -34,7 +34,7 @@ export default {
     return {
       searchQuery: '',
       apiData: [],
-      offset: '',
+      count: 0,
       showData: false,
       currentPage: 1,
       itemsPerPage: 20,
@@ -42,10 +42,10 @@ export default {
   },
   computed: {
     totalPages() {
-      var totalItems = this.apiData.length;
-      return Math.ceil(totalItems / this.itemsPerPage);
+      return Math.ceil(this.count / this.itemsPerPage);
     },
     paginatedData() {
+      // frontend handles pagination
       var end = this.currentPage * this.itemsPerPage;
       var start = end - this.itemsPerPage;
       return this.apiData.slice(start,end);
@@ -58,15 +58,14 @@ export default {
     fetchData() {
       // Replace 'YOUR_API_URL' with the actual API endpoint, and pass the 'searchQuery' as a query parameter
       this.showData = true;
-      //const apiUrl = `/flights/${this.searchQuery}?offset=${this.offset}`;
-      const apiUrl = `/v1/deals?filter=${this.searchQuery}&page=${this.currentPage}&pageSize=${this.itemsPerPage}`
+      const apiUrl = `/v1/deals?filter=${this.searchQuery}`
 
       // Make the API request using Axios or Fetch
       axios
         .get(apiUrl)
         .then((response) => {
           this.apiData = response.data.messages;
-          this.offset = response.data.offset;
+          this.count = response.data.count;
         })
         .catch((error) => {
           console.error(error);
@@ -89,7 +88,7 @@ export default {
       this.showData = false;
       this.searchQuery = "";
       this.apiData = [];
-      this.offset = "";
+      this.count = 0;
       this.currentPage = 1;
     }
   },

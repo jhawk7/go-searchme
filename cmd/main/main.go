@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -19,9 +20,33 @@ var gmClient *groupme.Client
 var cacheClient *cache.RedisClient
 
 type Params struct {
-	Filter   string `form:"filter"`
-	Page     string    `form:"page"`
-	PageSize string    `form:"pageSize"`
+	Filter string `form:"filter"`
+}
+
+func CheckCache() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var params Params
+		if err := c.ShouldBind(&params); err != nil {
+			c.Next()
+		}
+
+		value, cacheMiss, cacheErr := cacheClient.GetValue(c, params.Filter)
+		if cacheErr != nil {
+			err := fmt.Errorf("failed to retrieve value from cache; %v", cacheErr)
+			common.ErrorHandler(err, false)
+			c.Next()
+			return
+		}
+
+		if cacheMiss {
+			c.Next()
+			return
+		}
+
+		c.AbortWithStatusJSON(http.StatusOK, gin.H{
+			"messages": value,
+		})
+	}
 }
 
 func main() {
@@ -35,37 +60,25 @@ func main() {
 	}))
 
 	router.Use(static.Serve("/", static.LocalFile("./frontend/dist", false)))
-	router.GET("/healthcheck", HealthCheck)
-	router.GET("/flights/:keyword", GetFlightDeals)
-	router.GET("/v1/deals", GetFlightDeals) // v1/deals?filter=&page=&pageSize=20
+	router.GET("/healthcheck", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "up",
+		})
+	})
+
+	v1 := router.Group("/v1")
+	v1.Use(CheckCache())
+	{
+		v1.GET("/deals", GetFlightDeals)
+	}
+
 	router.Run(":8888")
 }
 
-func CheckCache() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var params Params
-		if err := c.ShouldBind(&params); err != nil {
-			c.Next()
-		}
-		cacheClient.GetValue(c, params.Filter)
-		c.AbortWithStatusJSON(http.StatusOK, gin.H{
-			"messages":,
-		})
-	}
-}
-
-func HealthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status": "up",
-	})
-}
-
 func GetFlightDeals(c *gin.Context) {
-	var params Params
-	var combinedMessages []groupme.Message
-	var err error
+	var par Params
 
-	if c.ShouldBind(&params) == nil {
+	if c.ShouldBind(&par) != nil {
 		common.ErrorHandler(fmt.Errorf("failed to bind query params"), false)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "bad request",
@@ -73,41 +86,55 @@ func GetFlightDeals(c *gin.Context) {
 		return
 	}
 
-	if hit, := checkCache(params); hit {
-
-	}
-
-	// retrieves last 200 messages via 2 API calls
-	var offset *string
-	for i := 0; i < 2; i++ {
-		groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(offset)
-		if groupErr != nil {
-			err = groupErr
-			break
-		}
-		combinedMessages = append(combinedMessages, groupMessages.Response.Messages...)
-		offset = &firstMessageId
-	}
-
-	if err != nil {
-		common.ErrorHandler(err, false)
+	combinedMessages, retrieveErr := retrieveMessages(c)
+	if retrieveErr != nil {
+		common.ErrorHandler(retrieveErr, false)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "bad request",
 		})
 		return
 	}
 
-	storeMessages("messages", &combinedMessages)
-
-	if params.Filter != "" {
-		filterGroupMessages(params.Filter, &combinedMessages, true)
+	if par.Filter != "" {
+		filterGroupMessages(par.Filter, combinedMessages, true)
 	}
-
-	storeMessages(params.Filter, &combinedMessages)
+	storeMessages(par.Filter, combinedMessages)
 
 	c.JSON(http.StatusOK, gin.H{
-		"messages": combinedMessages,
+		"messages": *combinedMessages,
+		"count":    len(*combinedMessages),
 	})
+}
+
+func retrieveMessages(ctx context.Context) (combinedMessages *[]groupme.Message, err error) {
+	// check cache for stored messages
+	cachedMessages, cacheMiss, cacheErr := cacheClient.GetValue(ctx, "messages")
+	if cacheErr != nil {
+		common.ErrorHandler(cacheErr, false)
+	}
+
+	if !cacheMiss {
+		bytes, _ := json.Marshal(cachedMessages)
+		err = json.Unmarshal(bytes, combinedMessages)
+		return
+	}
+
+	// retrieves last 200 messages via 2 API calls
+	var messages []groupme.Message
+	var offset *string
+	for i := 0; i < 2; i++ {
+		groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(offset)
+		if groupErr != nil {
+			err = groupErr
+			return
+		}
+		messages = append(messages, groupMessages.Response.Messages...)
+		offset = &firstMessageId
+	}
+
+	storeMessages("messages", &messages)
+	combinedMessages = &messages
+	return
 }
 
 func storeMessages(key string, messages *[]groupme.Message) {
