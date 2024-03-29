@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,25 +9,49 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
-	"github.com/jhawk7/go-searchme/pkg/groupme"
-	log "github.com/sirupsen/logrus"
+	"github.com/jhawk7/go-searchme/internal/pkg/cache"
+	"github.com/jhawk7/go-searchme/internal/pkg/common"
+	"github.com/jhawk7/go-searchme/internal/pkg/groupme"
 	xurls "mvdan.cc/xurls/v2"
 )
 
 var gmClient *groupme.Client
+var cacheClient *cache.RedisClient
+
+type Params struct {
+	Filter   string `form:"filter"`
+	Page     string    `form:"page"`
+	PageSize string    `form:"pageSize"`
+}
 
 func main() {
 	gmClient = groupme.InitClient()
+	cacheClient = cache.InitClient()
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET"},
 		AllowHeaders: []string{"Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"},
 	}))
+
 	router.Use(static.Serve("/", static.LocalFile("./frontend/dist", false)))
 	router.GET("/healthcheck", HealthCheck)
 	router.GET("/flights/:keyword", GetFlightDeals)
+	router.GET("/v1/deals", GetFlightDeals) // v1/deals?filter=&page=&pageSize=20
 	router.Run(":8888")
+}
+
+func CheckCache() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var params Params
+		if err := c.ShouldBind(&params); err != nil {
+			c.Next()
+		}
+		cacheClient.GetValue(c, params.Filter)
+		c.AbortWithStatusJSON(http.StatusOK, gin.H{
+			"messages":,
+		})
+	}
 }
 
 func HealthCheck(c *gin.Context) {
@@ -36,18 +61,24 @@ func HealthCheck(c *gin.Context) {
 }
 
 func GetFlightDeals(c *gin.Context) {
-	keyword := c.Param("keyword")
+	var params Params
 	var combinedMessages []groupme.Message
-	var offset *string
 	var err error
 
-	if offsetParam := c.DefaultQuery("offset", ""); offsetParam == "" {
-		offset = nil
-	} else {
-		offset = &offsetParam
+	if c.ShouldBind(&params) == nil {
+		common.ErrorHandler(fmt.Errorf("failed to bind query params"), false)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "bad request",
+		})
+		return
+	}
+
+	if hit, := checkCache(params); hit {
+
 	}
 
 	// retrieves last 200 messages via 2 API calls
+	var offset *string
 	for i := 0; i < 2; i++ {
 		groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(offset)
 		if groupErr != nil {
@@ -59,23 +90,35 @@ func GetFlightDeals(c *gin.Context) {
 	}
 
 	if err != nil {
-		ErrorHandler(err, false)
+		common.ErrorHandler(err, false)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "bad request",
 		})
 		return
 	}
 
-	if keyword != "" {
-		filterGroupMessages(keyword, &combinedMessages, true)
+	storeMessages("messages", &combinedMessages)
+
+	if params.Filter != "" {
+		filterGroupMessages(params.Filter, &combinedMessages, true)
 	}
 
-	//cache offset:messages
+	storeMessages(params.Filter, &combinedMessages)
 
 	c.JSON(http.StatusOK, gin.H{
 		"messages": combinedMessages,
-		"offset":   *offset,
 	})
+}
+
+func storeMessages(key string, messages *[]groupme.Message) {
+	kv := cache.KVPair{
+		Key:   key,
+		Value: *messages,
+	}
+
+	if err := cacheClient.Store(context.Background(), kv); err != nil {
+		common.ErrorHandler(fmt.Errorf("failed to cache messsages [key: %v] [err: %v]", key, err), false)
+	}
 }
 
 func filterGroupMessages(keyword string, groupMessages *[]groupme.Message, highlightLinks bool) {
@@ -97,15 +140,5 @@ func addHyperlinks(message *groupme.Message) {
 	for _, url := range urls {
 		hypertext := strings.ReplaceAll(message.Text, url, fmt.Sprintf(`<a href="%v">%v</a>`, url, url))
 		message.Text = hypertext
-	}
-}
-
-func ErrorHandler(err error, fatal bool) {
-	if err != nil {
-		log.Errorf("error: %v", err)
-
-		if fatal {
-			panic(err)
-		}
 	}
 }

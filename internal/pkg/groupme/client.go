@@ -3,7 +3,7 @@ package groupme
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 
@@ -63,7 +63,7 @@ func (client *Client) GetGroupMessages(beforeId *string) (messagesResponse Group
 		return
 	}
 
-	respBody, _ := ioutil.ReadAll(response.Body)
+	respBody, _ := io.ReadAll(response.Body)
 	if response.StatusCode > 299 {
 		respErr = fmt.Errorf("non-200 status received from user group response; [status: %v] [body: %v]", response.StatusCode, string(respBody))
 		return
@@ -78,7 +78,6 @@ func (client *Client) GetGroupMessages(beforeId *string) (messagesResponse Group
 	}
 
 	//can be used as before ID subsequent call to get earlier messages
-	firstMessageId = messagesResponse.Response.Messages[0].Id
-
+	//firstMessageId = messagesResponse.Response.Messages[0].Id
 	return
 }
