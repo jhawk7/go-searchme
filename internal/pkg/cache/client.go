@@ -48,7 +48,7 @@ func InitClient() *RedisClient {
 	return &redisClient
 }
 
-func (redisClient *RedisClient) GetValue(ctx context.Context, key string) (value []interface{}, miss bool, err error) {
+func (redisClient *RedisClient) GetValue(ctx context.Context, key string) (value interface{}, miss bool, err error) {
 	data, getErr := redisClient.svc.Get(ctx, key).Result()
 	if getErr != nil {
 		if getErr.Error() != redis.Nil.Error() {

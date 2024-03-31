@@ -4,3 +4,4 @@ bin/
 .idea/
 node_modules/
 redis-data/
+redis.conf

@@ -30,9 +30,9 @@ func CheckCache() gin.HandlerFunc {
 			c.Next()
 		}
 
-		value, cacheMiss, cacheErr := cacheClient.GetValue(c, params.Filter)
+		data, cacheMiss, cacheErr := cacheClient.GetValue(c, params.Filter)
 		if cacheErr != nil {
-			err := fmt.Errorf("failed to retrieve value from cache; %v", cacheErr)
+			err := fmt.Errorf("failed to retrieve data from cache; %v", cacheErr)
 			common.ErrorHandler(err, false)
 			c.Next()
 			return
@@ -43,8 +43,20 @@ func CheckCache() gin.HandlerFunc {
 			return
 		}
 
+		bytes, mErr := json.Marshal(data)
+		if mErr != nil {
+			c.Next()
+			return
+		}
+
+		var messages []groupme.Message
+		if uErr := json.Unmarshal(bytes, &messages); uErr != nil {
+			c.Next()
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusOK, gin.H{
-			"messages": value,
+			"messages": messages,
+			"count":    len(messages),
 		})
 	}
 }
@@ -104,23 +116,34 @@ func GetFlightDeals(c *gin.Context) {
 		"messages": *combinedMessages,
 		"count":    len(*combinedMessages),
 	})
+	common.LogInfo(fmt.Sprintf("stored data size %v for key %v", len(*combinedMessages), par.Filter))
 }
 
 func retrieveMessages(ctx context.Context) (combinedMessages *[]groupme.Message, err error) {
+	var messages []groupme.Message
+
 	// check cache for stored messages
-	cachedMessages, cacheMiss, cacheErr := cacheClient.GetValue(ctx, "messages")
+	cachedMessages, cacheMiss, cacheErr := cacheClient.GetValue(ctx, "data-messages")
 	if cacheErr != nil {
 		common.ErrorHandler(cacheErr, false)
 	}
 
 	if !cacheMiss {
-		bytes, _ := json.Marshal(cachedMessages)
-		err = json.Unmarshal(bytes, combinedMessages)
+		bytes, mErr := json.Marshal(cachedMessages)
+		if mErr != nil {
+			err = fmt.Errorf("failed to convert cached messages [error: %v]", mErr)
+			return
+		}
+
+		uErr := json.Unmarshal(bytes, &messages)
+		if uErr != nil {
+			err = fmt.Errorf("failed to unmarshal message data from cache [error: %v]", uErr)
+		}
+		combinedMessages = &messages
 		return
 	}
 
 	// retrieves last 200 messages via 2 API calls
-	var messages []groupme.Message
 	var offset *string
 	for i := 0; i < 2; i++ {
 		groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(offset)
@@ -132,7 +155,10 @@ func retrieveMessages(ctx context.Context) (combinedMessages *[]groupme.Message,
 		offset = &firstMessageId
 	}
 
-	storeMessages("messages", &messages)
+	if len(messages) > 0 {
+		storeMessages("data-messages", &messages)
+	}
+
 	combinedMessages = &messages
 	return
 }
