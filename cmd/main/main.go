@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gin-contrib/cors"
@@ -143,9 +145,10 @@ func retrieveMessages(ctx context.Context) (combinedMessages *[]groupme.Message,
 		return
 	}
 
-	// retrieves last 200 messages via 2 API calls
+	// retrieves last n*100 messages via n API calls
 	var offset *string
-	for i := 0; i < 2; i++ {
+	apiCalls, _ := strconv.Atoi(os.Getenv("MESSAGE_API_CALLS"))
+	for i := 0; i < apiCalls; i++ {
 		groupMessages, firstMessageId, groupErr := gmClient.GetGroupMessages(offset)
 		if groupErr != nil {
 			err = groupErr

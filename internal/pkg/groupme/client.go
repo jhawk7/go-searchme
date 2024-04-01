@@ -46,7 +46,8 @@ var ResponseHook = func(logger retryablehttp.Logger, res *http.Response) {
 
 func (client *Client) GetGroupMessages(beforeId *string) (messagesResponse GroupMessagesResponse, firstMessageId string, respErr error) {
 	var url string
-	//make api call based on messages before given beforeId if present
+	// make api call based on most recent (100) messages after given sinceID
+	// make subsequent api calls based on messages (100) before given beforeId if present
 	if beforeId == nil {
 		url = fmt.Sprintf(GetMessagesSinceEndpoint, client.GroupId, client.SinceId)
 	} else {
@@ -78,6 +79,6 @@ func (client *Client) GetGroupMessages(beforeId *string) (messagesResponse Group
 	}
 
 	//can be used as before ID subsequent call to get earlier messages
-	//firstMessageId = messagesResponse.Response.Messages[0].Id
+	firstMessageId = messagesResponse.Response.Messages[0].Id
 	return
 }
